@@ -1,5 +1,6 @@
 import {
   AbsoluteFill,
+  Easing,
   interpolate,
   spring,
   useCurrentFrame,
@@ -7,6 +8,7 @@ import {
 } from "remotion";
 import { loadFont } from "@remotion/google-fonts/Inter";
 import { FoodEmojis } from "../FoodEmojis";
+import { LightLeak } from "@remotion/light-leaks";
 
 const { fontFamily } = loadFont("normal", {
   weights: ["400", "700", "900"],
@@ -17,7 +19,16 @@ export const OutroScene: React.FC<{ username: string }> = ({ username }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const mainSpring = spring({ frame, fps, config: { damping: 200 } });
+  // Text SLAM from 200% with Easing.back
+  const mainProgress = interpolate(frame, [0, 12], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.out(Easing.back(2.5)),
+  });
+  const mainScale = interpolate(mainProgress, [0, 1], [2, 1]);
+  const mainOpacity = interpolate(frame, [0, 5], [0, 1], {
+    extrapolateRight: "clamp",
+  });
 
   const ctaSpring = spring({
     frame,
@@ -33,12 +44,12 @@ export const OutroScene: React.FC<{ username: string }> = ({ username }) => {
     config: { damping: 200 },
   });
 
-  const shareSpring = spring({
-    frame,
-    fps,
-    delay: 38,
-    config: { damping: 200 },
+  // Share button continuous pulse
+  const shareOpacity = interpolate(frame, [30, 38], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
   });
+  const sharePulse = 1 + Math.sin(frame * 0.15) * 0.06;
 
   const arrowBounce = Math.sin(frame * 0.2) * 8;
 
@@ -51,7 +62,7 @@ export const OutroScene: React.FC<{ username: string }> = ({ username }) => {
         alignItems: "center",
       }}
     >
-      <FoodEmojis opacity={0.1} />
+      <FoodEmojis opacity={0.1} speed={1.2} />
 
       <div
         style={{
@@ -62,11 +73,11 @@ export const OutroScene: React.FC<{ username: string }> = ({ username }) => {
           zIndex: 1,
         }}
       >
-        {/* Question */}
+        {/* Question — SLAM */}
         <div
           style={{
-            opacity: mainSpring,
-            transform: `scale(${interpolate(mainSpring, [0, 1], [1.2, 1])})`,
+            opacity: mainOpacity,
+            transform: `scale(${mainScale})`,
             fontSize: 64,
             fontWeight: 900,
             color: "#fff",
@@ -92,10 +103,11 @@ export const OutroScene: React.FC<{ username: string }> = ({ username }) => {
           Comment your food! 👇
         </div>
 
-        {/* Share prompt */}
+        {/* Share prompt — continuous pulse */}
         <div
           style={{
-            opacity: shareSpring,
+            opacity: shareOpacity,
+            transform: `scale(${sharePulse})`,
             display: "flex",
             alignItems: "center",
             gap: 16,
@@ -138,6 +150,11 @@ export const OutroScene: React.FC<{ username: string }> = ({ username }) => {
           @{username}
         </div>
       </div>
+
+      {/* Light leak overlay */}
+      <AbsoluteFill style={{ opacity: 0.35, mixBlendMode: "screen" }}>
+        <LightLeak seed={99} />
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 };

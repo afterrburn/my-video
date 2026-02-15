@@ -1,5 +1,6 @@
 import {
   AbsoluteFill,
+  Easing,
   Img,
   interpolate,
   spring,
@@ -24,6 +25,9 @@ export const PickScene: React.FC = () => {
     fps,
     config: { damping: 12 },
   });
+
+  // Cycling glow highlight: pulses through each food
+  const glowIndex = Math.floor((frame % (FOOD_ORDER.length * 15)) / 15);
 
   return (
     <AbsoluteFill
@@ -50,7 +54,7 @@ export const PickScene: React.FC = () => {
         Pick your favorite! 👇
       </div>
 
-      {/* Food grid - 2 columns, 3 rows (last row centered) */}
+      {/* Food grid */}
       <div
         style={{
           display: "flex",
@@ -63,14 +67,40 @@ export const PickScene: React.FC = () => {
       >
         {FOOD_ORDER.map((foodId, index) => {
           const food = FOOD_DATA[foodId];
-          const itemSpring = spring({
+          const delay = 8 + index * 6;
+
+          // Elastic pop-in with rotation toss
+          const popProgress = interpolate(
             frame,
-            fps,
-            delay: 8 + index * 6,
-            config: { damping: 10, stiffness: 100, mass: 0.8 },
+            [delay, delay + 14],
+            [0, 1],
+            {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+              easing: Easing.out(Easing.elastic(2)),
+            },
+          );
+          const scale = popProgress;
+          const rotation = interpolate(
+            frame,
+            [delay, delay + 14],
+            [index % 2 === 0 ? -15 : 15, 0],
+            {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+              easing: Easing.out(Easing.elastic(2)),
+            },
+          );
+          const opacity = interpolate(frame, [delay, delay + 4], [0, 1], {
+            extrapolateLeft: "clamp",
+            extrapolateRight: "clamp",
           });
-          const scale = interpolate(itemSpring, [0, 1], [0, 1]);
-          const y = interpolate(itemSpring, [0, 1], [40, 0]);
+
+          // Cycling glow
+          const isGlowing = glowIndex === index && frame > delay + 14;
+          const glowIntensity = isGlowing
+            ? Math.sin(frame * 0.3) * 0.3 + 0.7
+            : 0;
 
           return (
             <div
@@ -80,8 +110,8 @@ export const PickScene: React.FC = () => {
                 flexDirection: "column",
                 alignItems: "center",
                 gap: 16,
-                transform: `scale(${scale}) translateY(${y}px)`,
-                opacity: itemSpring,
+                transform: `scale(${scale}) rotate(${rotation}deg)`,
+                opacity,
                 width: index === 4 ? "auto" : "42%",
               }}
             >
@@ -93,7 +123,8 @@ export const PickScene: React.FC = () => {
                   borderRadius: "50%",
                   overflow: "hidden",
                   border: `4px solid ${food.color}`,
-                  boxShadow: `0 0 20px ${food.color}44`,
+                  boxShadow: `0 0 ${20 + glowIntensity * 30}px ${food.color}${isGlowing ? "88" : "44"}`,
+                  transition: "box-shadow 0.1s",
                 }}
               >
                 <Img
@@ -106,16 +137,29 @@ export const PickScene: React.FC = () => {
                 />
               </div>
 
-              {/* Number + Food name */}
+              {/* Bold numbered circle + Food name */}
               <div style={{ textAlign: "center" }}>
                 <div
                   style={{
-                    fontSize: 32,
-                    fontWeight: 900,
-                    color: food.color,
+                    width: 48,
+                    height: 48,
+                    borderRadius: "50%",
+                    background: food.color,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 8px",
                   }}
                 >
-                  {index + 1}
+                  <span
+                    style={{
+                      fontSize: 28,
+                      fontWeight: 900,
+                      color: "#fff",
+                    }}
+                  >
+                    {index + 1}
+                  </span>
                 </div>
                 <div
                   style={{

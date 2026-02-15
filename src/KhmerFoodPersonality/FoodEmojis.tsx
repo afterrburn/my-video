@@ -1,16 +1,28 @@
 import { interpolate, useCurrentFrame } from "remotion";
 
 const ALL_FOOD_EMOJIS = [
-  "\uD83C\uDF5A",
-  "\uD83C\uDF5C",
-  "\uD83D\uDD25",
-  "\uD83E\uDDCB",
-  "\uD83E\uDD69",
-  "\uD83E\uDD56",
-  "\uD83C\uDF36\uFE0F",
-  "\uD83E\uDD62",
-  "\uD83C\uDF5B",
-  "\uD83E\uDD5C",
+  "🍚",
+  "🍜",
+  "🔥",
+  "🧋",
+  "🥩",
+  "🥖",
+  "🌶️",
+  "🥢",
+  "🍛",
+  "🥜",
+  "🍲",
+  "🥘",
+  "🍱",
+  "🥗",
+  "🧆",
+  "🍤",
+  "🥟",
+  "🍖",
+  "🫕",
+  "🥥",
+  "🍠",
+  "🧅",
 ];
 
 type FloatingEmoji = {
@@ -21,6 +33,7 @@ type FloatingEmoji = {
   speed: number;
   delay: number;
   wobble: number;
+  pulseOffset: number;
 };
 
 const generateEmojis = (count: number, seed: number): FloatingEmoji[] => {
@@ -36,36 +49,40 @@ const generateEmojis = (count: number, seed: number): FloatingEmoji[] => {
       emoji: ALL_FOOD_EMOJIS[i % ALL_FOOD_EMOJIS.length],
       x: rand * 100,
       y: rand2 * 100,
-      size: 30 + rand3 * 40,
-      speed: 0.2 + rand * 0.5,
-      delay: rand2 * 40,
-      wobble: rand3 * 20,
+      size: 40 + rand3 * 50,
+      speed: 0.4 + rand * 0.8,
+      delay: rand2 * 30,
+      wobble: rand3 * 25,
+      pulseOffset: rand * Math.PI * 2,
     });
   }
   return emojis;
 };
 
-const EMOJIS = generateEmojis(15, 77);
+const EMOJIS = generateEmojis(22, 77);
 
-export const FoodEmojis: React.FC<{ opacity?: number }> = ({
+export const FoodEmojis: React.FC<{ opacity?: number; speed?: number }> = ({
   opacity: baseOpacity = 0.3,
+  speed: speedMultiplier = 1,
 }) => {
   const frame = useCurrentFrame();
 
   return (
     <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
       {EMOJIS.map((e, i) => {
+        const adjustedSpeed = e.speed * speedMultiplier;
         const y = interpolate(
           frame - e.delay,
           [0, 300],
-          [e.y, e.y - e.speed * 60],
+          [e.y, e.y - adjustedSpeed * 80],
           { extrapolateRight: "extend", extrapolateLeft: "clamp" },
         );
         const x =
-          e.x + Math.sin((frame - e.delay) * 0.03) * e.wobble;
-        const opacity = interpolate(frame, [0, 20], [0, baseOpacity], {
+          e.x + Math.sin((frame - e.delay) * 0.04) * e.wobble;
+        const opacity = interpolate(frame, [0, 15], [0, baseOpacity], {
           extrapolateRight: "clamp",
         });
+        const pulse = 1 + Math.sin(frame * 0.08 + e.pulseOffset) * 0.15;
         return (
           <div
             key={i}
@@ -75,7 +92,7 @@ export const FoodEmojis: React.FC<{ opacity?: number }> = ({
               top: `${((y % 120) + 120) % 120}%`,
               fontSize: e.size,
               opacity,
-              transform: `rotate(${Math.sin((frame + i * 30) * 0.02) * 15}deg)`,
+              transform: `rotate(${Math.sin((frame + i * 30) * 0.02) * 15}deg) scale(${pulse})`,
             }}
           >
             {e.emoji}

@@ -1,14 +1,15 @@
 import {
   AbsoluteFill,
+  Easing,
   Img,
   interpolate,
-  spring,
+  interpolateColors,
   staticFile,
   useCurrentFrame,
-  useVideoConfig,
 } from "remotion";
 import { loadFont } from "@remotion/google-fonts/Inter";
 import { loadFont as loadKhmerFont } from "@remotion/google-fonts/Battambang";
+import { LightLeak } from "@remotion/light-leaks";
 import { FoodPersonality } from "../types";
 
 const { fontFamily } = loadFont("normal", {
@@ -25,58 +26,93 @@ export const RevealScene: React.FC<{
   index: number;
 }> = ({ food, index }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
 
-  // Photo + emoji animate in
-  const photoSpring = spring({
-    frame,
-    fps,
-    config: { damping: 10, stiffness: 100, mass: 0.8 },
+  // --- CAMERA SHAKE (frames 0-5) ---
+  const shakeIntensity = interpolate(frame, [0, 5], [8, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
   });
+  const shakeX = Math.sin(frame * 25) * shakeIntensity;
+  const shakeY = Math.cos(frame * 30) * shakeIntensity;
 
-  // Name slides up
-  const nameSpring = spring({
+  // --- COLOR EXPLOSION (frames 0-6) ---
+  const bgColor = interpolateColors(
     frame,
-    fps,
-    delay: 8,
-    config: { damping: 12 },
-  });
-  const nameY = interpolate(nameSpring, [0, 1], [40, 0]);
-
-  // Archetype badge
-  const archSpring = spring({
-    frame,
-    fps,
-    delay: 14,
-    config: { damping: 200 },
-  });
-
-  // Traits slide in one by one
-  const traitSprings = food.traits.map((_, i) =>
-    spring({
-      frame,
-      fps,
-      delay: 20 + i * 8,
-      config: { damping: 12 },
-    }),
+    [0, 6],
+    ["#0a0a0a", `${food.color}30`],
   );
 
-  // Tagline fades in last
-  const taglineSpring = spring({
-    frame,
-    fps,
-    delay: 50,
-    config: { damping: 200 },
+  // --- PHOTO SLAM (frames 0-12) with Easing.back(3) overshoot ---
+  const photoProgress = interpolate(frame, [0, 12], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.out(Easing.back(3)),
   });
+  const photoScale = interpolate(photoProgress, [0, 1], [0.3, 1]);
+  const photoRotation = interpolate(
+    frame,
+    [0, 12],
+    [index % 2 === 0 ? -8 : 8, 0],
+    {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.out(Easing.back(2)),
+    },
+  );
+  const photoOpacity = interpolate(frame, [0, 4], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  // --- KEN BURNS (frames 0-105) ---
+  const kenBurns = interpolate(frame, [0, 105], [1.0, 1.15], {
+    extrapolateRight: "clamp",
+  });
+
+  // --- NAME SLAM (frames 8-18) with Easing.elastic(2) ---
+  const nameProgress = interpolate(frame, [8, 18], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.out(Easing.elastic(2)),
+  });
+  const nameScale = interpolate(nameProgress, [0, 1], [1.5, 1]);
+  const nameOpacity = interpolate(frame, [8, 11], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  // --- ARCHETYPE SNAP (frames 14-22) slides from off-screen ---
+  const archProgress = interpolate(frame, [14, 22], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.out(Easing.back(2)),
+  });
+  const archX = interpolate(archProgress, [0, 1], [400, 0]);
+  const archOpacity = interpolate(frame, [14, 17], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  // --- TRAIT BARS (frames 22-80) ---
+  const traitBarDelays = [22, 34, 46];
+
+  // --- TAGLINE (frames 50-60) subtle upward slide ---
+  const taglineProgress = interpolate(frame, [50, 60], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.out(Easing.ease),
+  });
+  const taglineY = interpolate(taglineProgress, [0, 1], [30, 0]);
 
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: "#0a0a0a",
-        backgroundImage: `linear-gradient(135deg, #0a0a0a 0%, ${food.color}40 50%, ${food.color}55 100%)`,
+        backgroundColor: bgColor,
+        backgroundImage: `linear-gradient(135deg, ${bgColor} 0%, ${food.color}40 50%, ${food.color}55 100%)`,
         fontFamily,
         justifyContent: "center",
         alignItems: "center",
+        transform: `translate(${shakeX}px, ${shakeY}px)`,
       }}
     >
       {/* Radial glow */}
@@ -87,7 +123,7 @@ export const RevealScene: React.FC<{
           height: 600,
           borderRadius: "50%",
           background: `radial-gradient(circle, ${food.color}22 0%, transparent 70%)`,
-          opacity: photoSpring,
+          opacity: photoOpacity,
           top: "15%",
           left: "50%",
           transform: "translateX(-50%)",
@@ -106,7 +142,7 @@ export const RevealScene: React.FC<{
         {/* Food number */}
         <div
           style={{
-            opacity: photoSpring,
+            opacity: photoOpacity,
             fontSize: 28,
             fontWeight: 700,
             color: food.color,
@@ -117,12 +153,12 @@ export const RevealScene: React.FC<{
           #{index + 1}
         </div>
 
-        {/* Circular food photo with emoji overlay */}
+        {/* Photo SLAM with Ken Burns */}
         <div
           style={{
             position: "relative",
-            transform: `scale(${interpolate(photoSpring, [0, 1], [0.5, 1])})`,
-            opacity: photoSpring,
+            transform: `scale(${photoScale}) rotate(${photoRotation}deg)`,
+            opacity: photoOpacity,
           }}
         >
           <div
@@ -141,6 +177,7 @@ export const RevealScene: React.FC<{
                 width: "100%",
                 height: "100%",
                 objectFit: "cover",
+                transform: `scale(${kenBurns})`,
               }}
             />
           </div>
@@ -157,11 +194,11 @@ export const RevealScene: React.FC<{
           </div>
         </div>
 
-        {/* Food name (Khmer + English) */}
+        {/* Name SLAM */}
         <div
           style={{
-            transform: `translateY(${nameY}px)`,
-            opacity: nameSpring,
+            transform: `scale(${nameScale})`,
+            opacity: nameOpacity,
             textAlign: "center",
             marginTop: 8,
           }}
@@ -189,11 +226,11 @@ export const RevealScene: React.FC<{
           </div>
         </div>
 
-        {/* Archetype badge */}
+        {/* Archetype SNAP from off-screen */}
         <div
           style={{
-            opacity: archSpring,
-            transform: `scale(${archSpring})`,
+            opacity: archOpacity,
+            transform: `translateX(${archX}px)`,
             background: `${food.color}22`,
             border: `2px solid ${food.color}66`,
             borderRadius: 50,
@@ -213,7 +250,7 @@ export const RevealScene: React.FC<{
           </span>
         </div>
 
-        {/* 3 Traits with slide-in */}
+        {/* Animated Trait Bars (skill meters) */}
         <div
           style={{
             display: "flex",
@@ -224,13 +261,32 @@ export const RevealScene: React.FC<{
           }}
         >
           {food.traits.map((trait, i) => {
-            const x = interpolate(traitSprings[i], [0, 1], [300, 0]);
+            const barDelay = traitBarDelays[i];
+            const barFill = interpolate(
+              frame,
+              [barDelay, barDelay + 18],
+              [0, 0.7 + i * 0.1],
+              {
+                extrapolateLeft: "clamp",
+                extrapolateRight: "clamp",
+                easing: Easing.out(Easing.ease),
+              },
+            );
+            const barOpacity = interpolate(
+              frame,
+              [barDelay, barDelay + 5],
+              [0, 1],
+              {
+                extrapolateLeft: "clamp",
+                extrapolateRight: "clamp",
+              },
+            );
+
             return (
               <div
                 key={i}
                 style={{
-                  opacity: traitSprings[i],
-                  transform: `translateX(${x}px)`,
+                  opacity: barOpacity,
                   display: "flex",
                   alignItems: "center",
                   gap: 16,
@@ -238,27 +294,58 @@ export const RevealScene: React.FC<{
                   border: `1px solid ${food.color}33`,
                   borderRadius: 16,
                   padding: "14px 24px",
+                  position: "relative",
+                  overflow: "hidden",
                 }}
               >
-                <span style={{ fontSize: 42 }}>{food.traitEmojis[i]}</span>
+                {/* Animated fill bar behind content */}
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: `${barFill * 100}%`,
+                    background: `${food.color}25`,
+                    borderRadius: 16,
+                  }}
+                />
+                <span style={{ fontSize: 42, zIndex: 1 }}>
+                  {food.traitEmojis[i]}
+                </span>
                 <span
                   style={{
                     fontSize: 36,
                     fontWeight: 700,
                     color: "#fff",
+                    zIndex: 1,
+                    flex: 1,
                   }}
                 >
                   {trait}
+                </span>
+                {/* Percentage indicator */}
+                <span
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 700,
+                    color: food.color,
+                    zIndex: 1,
+                    opacity: barOpacity,
+                  }}
+                >
+                  {Math.round(barFill * 100)}%
                 </span>
               </div>
             );
           })}
         </div>
 
-        {/* Tagline */}
+        {/* Tagline — subtle upward slide */}
         <div
           style={{
-            opacity: taglineSpring,
+            opacity: taglineProgress,
+            transform: `translateY(${taglineY}px)`,
             fontSize: 34,
             color: "#aaa",
             textAlign: "center",
@@ -271,6 +358,11 @@ export const RevealScene: React.FC<{
           {food.tagline}
         </div>
       </div>
+
+      {/* Light leak overlay tinted to food hue */}
+      <AbsoluteFill style={{ opacity: 0.3, mixBlendMode: "screen" }}>
+        <LightLeak seed={index * 7 + 13} />
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 };
